@@ -1,0 +1,336 @@
+---
+title: "NYC Citi Bikes Notes"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(tsibbledata)
+library(tsibble)
+library(lubridate)
+library(jsonlite)
+library(leaflet)
+library(sf)
+library(e1071)
+```
+
+```{r}
+bikes_data <- tsibbledata::nyc_bikes
+
+
+glimpse(bikes_data)
+```
+
+What is the pattern of bike hires over time
+  - year
+  - month
+  - week
+  - day
+  
+```{r}
+bikes_data <- bikes_data %>% 
+  mutate(year = year(start_time),
+         month = month(start_time, label = TRUE, abbr = FALSE),
+         day = wday(start_time, label = TRUE, abbr = FALSE),
+         day_of_month = mday(start_time),
+         start_hod = strftime(round_date(bikes_data$start_time, "30 minutes"),
+                              format= "%H:%M",
+                              tz = "America/New_York"),
+         end_hod = strftime(round_date(bikes_data$stop_time, "30 minutes"), 
+                              format= "%H:%M",
+                              tz = "America/New_York"))
+
+
+
+# 
+# bikes_data %>% 
+#   mutate(start_hod = strftime(bikes_data$start_time, 
+#                               format= "%H:%M",
+#                               tz = "America/New_York"))
+  
+bikes_data %>% 
+  distinct(year)
+# Only shows 2018
+
+bikes_data %>% 
+  ggplot(aes(x = fct_rev(month)))+
+  geom_histogram(stat = "count", fill = "#6B7FBA")+
+  labs(
+    x = "Months",
+    y = "Total Bike Rentals",
+    title = "Bike Rentals by Month for 2018"
+      )+
+  coord_flip()+
+  theme_classic()
+
+  
+
+bikes_data %>% 
+  index_by(month) %>% 
+  group_by(bike_id) %>% 
+  count()
+
+
+bikes_data %>% 
+  ggplot(aes(x = fct_shift(fct_rev(day), -1)))+
+  geom_histogram(stat = "count", fill = "#3DA4CA")+
+  labs(
+    x = "Months",
+    y = "Total Bike Rentals",
+    title = "Bike Rentals by Day for 2018"
+      )+
+  coord_flip()+
+  theme_classic()
+
+
+```
+  
+ Calculating Ride Duration
+ 
+```{r}
+bikes_data <- bikes_data %>% 
+  mutate(ride_duration = as.numeric(as.duration(stop_time - start_time), "minutes")) %>% 
+  mutate(ride_duration = round(ride_duration, digits = 2))
+
+ # Average duration of bike rides by month
+bikes_data %>% 
+  filter(type == "Subscriber") %>% 
+  index_by(month) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = fct_rev(month), y = avg_ride_duration))+
+  geom_col()+
+  labs(
+    x = "Month",
+    y = "Average Duration of Hire (minutes)",
+    title = "Average duration of bike hires by month"
+  )+
+  coord_flip()+
+  theme_classic()
+
+bikes_data %>% 
+  filter(type == "Subscriber") %>% 
+  filter(ride_duration <= 45.00) %>% 
+  index_by(month) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = fct_rev(month), y = avg_ride_duration))+
+  geom_col()+
+  labs(
+    x = "Month",
+    y = "Average Duration of Hire (minutes)",
+    title = "Average duration of bikes hired by month"
+  )+
+  coord_flip()+
+  theme_classic()
+
+```
+
+### Add Rider age and check if it impacts type of user
+
+```{r}
+bikes_data <- bikes_data %>% 
+  mutate(rider_age = year - birth_year)
+
+bikes_data %>% 
+  filter(rider_age <= 60) %>% 
+  mutate(avg_age = mean(rider_age)) %>% 
+  mutate(avg_age = round(avg_age, digits = 1)) %>% 
+  distinct(avg_age)
+
+# 36 Average Age
+
+bikes_data %>% 
+  filter(type == "Subscriber") %>% 
+  index_by(month) %>% 
+  summarise(avg_age = mean(rider_age)) %>% 
+  mutate(avg_age = round(avg_age, digits = 1)) %>% 
+  ggplot(aes(x = month, y = avg_age))+
+  geom_col()
+
+bikes_data %>% 
+  filter(type == "Customer") %>% 
+  index_by(month) %>% 
+  summarise(avg_age = mean(rider_age)) %>% 
+  mutate(avg_age = round(avg_age, digits = 1)) %>% 
+  ggplot(aes(x = month, y = avg_age))+
+  geom_col()
+```
+
+
+```{r, warning=FALSE, message = FALSE}
+bikes_data %>% 
+  filter(type == "Subscriber") %>% 
+  ggplot(aes(x = rider_age))+
+  geom_histogram(colour = "white", fill = "#6B7FBA")+
+  geom_vline(xintercept = median(bikes_data$rider_age),
+             col = "firebrick",
+             lwd = 2) +
+  annotate("text",
+           x = median(bikes_data$rider_age) * 1.3,
+           y = median(bikes_data$rider_age) * 18,
+           label = paste("Average Rider Age = ", median(bikes_data$rider_age)),
+           col = "firebrick",
+           size = 4
+           )+
+  labs(
+    x = "Age of User",
+    y = "Number of Users"
+  )+
+  theme_classic()+
+  xlim(20, 75)
+
+```
+
+### Adding potential rates for customer journeys
+
+```{r}
+
+bikes_data %>% 
+  filter(type == "Customer") %>% 
+  mutate(ride_fee = ifelse(ride_duration >= 45, 15, 3.99)) %>% 
+  ggplot(aes(x = month, y = ride_fee))+
+  geom_col()+
+  labs(
+    x= "Months",
+    y = "Estimated revenue ($)",
+    title = "Estimated Revenue from non-subscribers in 2018"
+  )
+  
+
+```
+
+###  Comparing gender distribution for usage
+ 
+```{r}
+bikes_data %>% 
+  ggplot(aes(x = fct_rev(month), fill = gender))+
+  geom_histogram(stat = "count", position = "dodge")+
+  labs(
+    x = "Months",
+    y = "Number of users",
+    title = "Number of recorded users by gender"
+  )+
+  coord_flip()
+
+
+bikes_data %>%
+  group_by(gender) %>% 
+  count()
+
+3069 / nrow(bikes_data) 
+
+```
+ 
+### Plot locations of bike stations on a map 
+
+```{r}
+
+# bikes_data %>%
+#   filter(start_station %in% c("3186", "3203", "3195", "3183", "3202")) %>%
+#   filter(end_station %in% c("3186", "3183", "3203", "3195", "3202")) %>%
+#   leaflet() %>%
+#   addTiles() %>%
+#   addMarkers(
+#     lat = ~unique(start_lat),
+#     lng = ~unique(start_long),
+#     popup = ~unique(start_station),
+#     clusterOptions = markerClusterOptions()
+#     )%>%
+#     addMarkers(
+#     lat = ~unique(end_lat),
+#     lng = ~unique(end_long),
+#     popup = ~unique(end_station),
+#     clusterOptions = markerClusterOptions()
+#     )
+
+
+bikes_data %>% 
+  filter(start_hod <= "10:00") %>% 
+  count(start_station) %>% 
+  arrange(desc(n))
+
+bikes_data %>%
+  filter(
+    start_station %in% c("3203", "3213", "3267", "3269", "3186"),
+    end_station %in% c("3186", "3183", "3195", "3202", "3639")) %>% 
+  leaflet() %>% 
+  addTiles() %>% 
+  addCircleMarkers(
+    color = "blue",
+    lat = ~unique(end_lat),
+    lng = ~unique(end_long),
+    popup = ~unique(end_station)
+  )%>%
+  addCircleMarkers(
+    color = "green",
+    lat = ~unique(start_lat),
+    lng = ~unique(start_long),
+    popup = ~unique(start_station)
+  )
+#   Start Stations
+
+# 3203 is residential area
+# 3213 is residential area
+# 3267 is residential area
+# 3269 is residential area
+# 3186 is residential area
+
+#   End Stations
+
+# 3186 retail/commercial/finance hub
+# 3183 right next to Ferry Terminal
+# 3195 right next to transport hub (trains & buses)
+# 3202 - uni/mall area
+# 3639 financial sector
+
+bikes_data %>% 
+  count(bike_id, start_station) %>% 
+  arrange(desc(n))
+
+```
+
+### Calculating Distance
+
+No point in calculating distance as start/end stations are all next to each other and no distance tracker data is included
+
+
+### Checking to see if standard commuting times apply
+
+```{r}
+
+# bikes_data %>%
+#  # filter(month == "January") %>% 
+#   ggplot(aes(x = start_hod))+
+#   geom_histogram(stat = "count")+
+#   labs(
+#     x = "Journey Start Time"
+#   )+
+#   facet_wrap(~month)
+
+  bikes_data %>% 
+    ggplot(aes(x = end_hod, group = type, colour = type))+
+    geom_line(stat = "count")+
+    labs(
+      x = "Journey End Times",
+      y = "Number of Journeys",
+      title = "Journey times by user type"
+    )+
+    guides(colour = guide_legend(title = "User Type")
+    )+
+    scale_x_discrete(
+      breaks = c("00:00","03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"))
+  
+  bikes_data %>% 
+    ggplot(aes(x = start_hod, group = type, colour = type))+
+    geom_line(stat = "count")+
+    labs(
+      x = "Journey Start Times",
+      y = "Number of Journeys",
+      title = "Journey times by user type"
+    )+
+    guides(colour = guide_legend(title = "User Type")
+    )+
+    scale_x_discrete(
+      breaks = c("00:00","03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"))
+
+
+```

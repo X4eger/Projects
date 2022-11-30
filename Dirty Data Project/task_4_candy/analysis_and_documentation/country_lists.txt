@@ -1,0 +1,44 @@
+pattern_usa <- c(
+      "usa", "US", "USA", "United States of America", "uSA", "united states", 
+      "United States", "us", "USSA", "U.S.A", "Murica", "USA!", "Usa", "U.S.", 
+      "Us", "America", "Units States", "United states", "USA USA USA", 
+      "the best one - usa", "USA! USA! USA!", "u.s.", 
+      "The Yoo Ess of Aaayyyyyy", "united states of america", "USA!!!!!!", 
+      "USA! USA!", "United Sates", "Sub-Canadian North America... 'Merica", 
+      "Trumpistan", "U.s.", "Merica", "UNited States", "United Stetes", 
+      "america", "USA USA USA USA", "United State", "god's country",
+      "USA (I think but it's an election year so who can really tell)", "U.S.A.",
+      "Unhinged states","USAUSAUSA", "United staes", "u.s.a.", "USAUSAUSA", 
+      "United States of America", "US of A", "unhinged states", "Unites States",
+      "The United States", "North Carolina", "Unied States", "U S", 
+      "The United States of America", "unite states", "USA? Hard to tell anymore..",
+      "'merica", "usas", "Pittsburgh", "New York", "California", "USa", 
+      "I pretend to be from Canada, but I am really from the United States.", 
+      "United Stated", "Ahem....Amerca", "New Jersey", "United ststes", 
+      "United Statss", "murrika", "USAA", "Alaska", "united States", "u s a",
+      "United Statea", "united ststes", "USA USA USA!!!!", "EUA", "United  States of America"
+)
+
+pattern_uk <- c("UK", "england", "uk", "United Kingdom", "England","United Kindom",
+                "U.K.", "Uk", "Scotland", "endland", "United kingdom")
+
+pattern_canada <- c("Canada", "canada", "Canada`", "CANADA", "soviet canuckistan"
+                    )
+
+pattern_other <- c("Japan", "france", "A tropical island south of the equator", 
+                   "Switzerland", "Neverland", "this one", "Korea","belgium", 
+                   "croatia", "Portugal", "españa", "Panama",
+                   "there isn't one for old men", "one of the best ones", "France",
+                   "Australia", "hungary", "Austria", "Somewhere", "New Zealand",
+                   "Germany", "Mexico", "Brasil", "South Korea", 
+                   "Philippines", "sweden", "The Netherlands", "Finland", "China",
+                   "germany", "See above", "kenya", "Netherlands", "Not the USA or Canada",
+                   "netherlands", "Denial", "UAE", "finland", "Europe", "Earth", 
+                   "Costa Rica", "insanity lately","The republic of Cascadia", 
+                    "Cascadia", "cascadia", "Greece", "australia", "A", "Can",
+                   "Canae", "Ireland", "South africa", "Iceland", "Denmark", "UD",
+                   "Indonesia", "Atlantis", "N. America", "Singapore", "Taiwan", 
+                   "hong kong", "spain", "Sweden", "Hong Kong", "Narnia", 
+                   "subscribe to dm4uz3 on youtube", "I don't know anymore",
+                   "Fear and Loathing", "46", "45.0", "45", "44.0", "35", "32",
+                   "30.0", "1", "54.0", "51.0", "47.0")

@@ -1,0 +1,164 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(fable)
+library(tsibble)
+library(tsibbledata)
+library(lubridate)
+```
+
+```{r}
+nhs_forecast <- read_csv(here::here("../../clean_data/nhs_speciality.csv"))
+```
+
+```{r}
+nhs_forecast <- nhs_forecast %>% 
+  filter(location_name == "Scotland",
+         admission_type == "All Inpatients and Day cases") %>% 
+  group_by(quarter) %>% 
+  summarise(spells = sum(spells)) 
+
+my_ts <- ts(data = nhs_forecast %>% pull(spells),
+            start = c(2016, 4), frequency = 4) %>%
+  as_tsibble() %>% 
+  filter(str_detect(index, "201"))
+
+my_ts2 <- ts(data = nhs_forecast %>% pull(spells),
+            start = c(2016, 4), frequency = 4) %>%
+  as_tsibble()  
+  
+
+nhs_forcast_tsibble_pre_covid <- as_tsibble(nhs_forecast) %>% 
+  filter(str_detect(quarter, "201[789]"))
+  
+```
+
+```{r}
+fit <- my_ts %>%
+  model(
+    snaive = SNAIVE(value),
+    mean_model = MEAN(value),
+    arima = ARIMA(value)
+  )
+
+fit <- my_ts %>% 
+  model(ETS(value ~ error("A") + trend("A") + season("A")))
+fit
+
+report(fit)
+```
+
+```{r}
+forecast_2years <- fit %>%
+  fabletools::forecast(h = 8)
+
+forecast <- as_tibble(forecast_2years) %>% 
+  select(index, value_forecast = '.mean') %>% 
+  mutate(value = NA)
+```
+
+```{r}
+forecast_2years %>%
+  autoplot(my_ts) +
+  ggtitle("Forecasts for Australian beer sales") +
+  xlab("Year") +
+  guides(colour = guide_legend(title = "Forecast"))
+
+
+```
+
+```{r}
+my_ts2 %>% 
+  left_join(forecast, by = "index") %>% 
+  ggplot() +
+  geom_line(aes(x = index, y = value.x), colour = "red") +
+  geom_line(aes(x = index, y = value_forecast), colour = "blue")
+```
+
+```{r}
+nhs_forecast <- nhs_forecast %>% 
+  filter(location_name == "Scotland",
+         admission_type == "All Inpatients and Day cases") %>% 
+  group_by(quarter) %>% 
+  summarise(spells = sum(spells)) 
+
+my_ts <- ts(data = nhs_forecast %>% pull(spells),
+            start = c(2016, 4), frequency = 4) %>%
+  as_tsibble() %>% 
+  filter(str_detect(index, "201"))
+
+my_ts2 <- ts(data = nhs_forecast %>% pull(spells),
+            start = c(2016, 4), frequency = 4) %>%
+  as_tsibble() 
+
+fit <- my_ts %>% 
+  model(ETS(value ~ error("A") + trend("A") + season("A")))
+
+forecast_2years <- fit %>%
+  fabletools::forecast(h = 8)
+
+forecast <- as_tibble(forecast_2years) %>% 
+  select(index, value_forecast = '.mean') %>% 
+  mutate(value = NA)
+
+my_ts2 %>% 
+  left_join(forecast, by = "index") %>% 
+  ggplot() +
+  geom_line(aes(x = index, y = value.x), colour = "red") +
+  geom_line(aes(x = index, y = value_forecast), colour = "blue")
+```
+
+```{r}
+nhs_forecast <- read_csv(here::here("../../clean_data/nhs_bed_occupancy.csv"))
+
+nhs_forecast <- nhs_forecast %>% 
+  filter(location_name == "Scotland",
+         specialty_name == "All Acute") 
+  
+
+my_ts <- ts(data = nhs_forecast %>% pull(percentage_occupancy),
+            start = c(2016, 4), frequency = 4) %>%
+  as_tsibble() %>% 
+  filter(str_detect(index, "201"))
+
+my_ts2 <- ts(data = nhs_forecast %>% pull(percentage_occupancy),
+            start = c(2016, 4), frequency = 4) %>%
+  as_tsibble() 
+
+fit <- my_ts %>% 
+  model(ETS(value ~ error("A") + trend("A") + season("A")))
+
+forecast_2years <- fit %>%
+  fabletools::forecast(h = 8) %>% 
+  mutate(con = hilo(value, 80)) %>%
+  unpack_hilo(con)
+
+forecast <- as_tibble(forecast_2years) %>% 
+  select(index, value_forecast = '.mean', con_lower, con_upper) %>% 
+  mutate(value = NA)
+
+my_ts2 %>% 
+  left_join(forecast, by = "index") %>% 
+  ggplot() +
+  geom_line(aes(x = index, y = value.x), colour = "red") +
+  geom_line(aes(x = index, y = value_forecast), colour = "blue") +
+  geom_ribbon(aes(x = index, ymin=con_lower,ymax= con_upper),alpha=0.3, fill = "blue")
+```
+
+
+```{r}
+forecast_2years %>% 
+  mutate(con = hilo(value, 80)) %>%
+  unpack_hilo(con)
+  pull(con)
+```
+
+```{r}
+forecast_2years %>% 
+  autoplot(my_ts2)
+```
+

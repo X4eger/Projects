@@ -1,0 +1,138 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+```
+
+```{r}
+nhs_speciality <- read_csv(here::here("../raw_data/inpatient_and_daycase_by_nhs_board_of_treatment_and_specialty.csv"))
+nhs_age_sex <- read_csv(here::here("../raw_data/inpatient_and_daycase_by_nhs_board_of_treatment_age_and_sex.csv"))
+nhs_deprivation <- read_csv(here::here("../raw_data/inpatient_and_daycase_by_nhs_board_of_treatment_and_simd.csv"))
+
+
+
+nhs_hb_codes <- read_csv(here::here("../raw_data/health_board_codes.csv")) %>% 
+  select(HB, HBName)
+nhs_shb_codes <- read_csv(here::here("../raw_data/special_health_board_codes.csv")) %>% 
+  select("HBName" = SHBName,
+         "HB" = SHB) 
+nhs_country_code <- read_csv(here::here("../raw_data/country_code.csv")) %>% 
+  select("HBName" = CountryName,
+         "HB" = Country)
+nhs_other_code <- read_csv(here::here("../raw_data/other_codes.csv")) %>% 
+  select("HBName" = ISDHBTName,
+         "HB" = ISDHBT) 
+nhs_hospital_code <- read_csv(here::here("../raw_data/hospital_codes.csv")) %>% 
+  select("HBName" = LocationName,
+         "HB" = Location)
+
+codes <- bind_rows(nhs_hb_codes, nhs_shb_codes, nhs_country_code, nhs_other_code, nhs_hospital_code)
+
+```
+
+
+```{r}
+nhs_speciality %>% 
+  left_join(codes, by = c("HB")) %>% 
+  left_join(codes, by = c("Location" = "HB")) %>% 
+  select(1:2, HB, "health_board" = HBName.x, HBQF, "location_code" = Location, "location_name" = HBName.y,           everything()) %>% 
+  clean_names()
+
+
+codes
+  
+```
+
+```{r}
+clean_data <- function(data){
+  
+  data %>% 
+  left_join(codes, by = c("HB")) %>% 
+  left_join(codes, by = c("Location" = "HB")) %>% 
+  select(1:2, HB, "health_board" = HBName.x, HBQF, "location_code" = Location, "location_name" = HBName.y,           everything()) %>% 
+  clean_names() %>% 
+  mutate(quarter = str_replace(quarter, pattern = "([0-9]{4})([Q][0-4])", replacement = "\\1 \\2"))
+}
+
+```
+
+```{r}
+write_csv(nhs_speciality %>% clean_data(), here::here(".../clean_data/nhs_speciality.csv"))
+write_csv(nhs_deprivation %>% clean_data(), here::here(".../clean_data/nhs_speciality.csv"))
+write_csv(nhs_age_sex %>% clean_data(), here::here(".../clean_data/nhs_speciality.csv"))
+
+
+```
+
+
+```{r}
+nhs_bed_occupancy <- read_csv("../raw_data/beds_by_nhs_board_of_treatment_and_specialty.csv")
+```
+
+```{r}
+nhs_bed_occupancy %>% 
+  clean_data()
+```
+
+```{r}
+covid_age_sex <- read_csv(here::here("../raw_data/covid_hospitalisations_data_age_sex.csv"))
+```
+
+```{r}
+b <- covid_age_sex %>% 
+  filter(AgeGroup == "All ages",
+         Sex == "All",
+         HB == "S92000003",
+         AdmissionType == "Emergency") %>% 
+  mutate(WeekEnding = ymd(WeekEnding)) # %>% 
+ # ggplot() +
+#  geom_line(aes(x = WeekEnding, y = NumberAdmissions), colour = "red") +
+ # geom_line(aes(x = WeekEnding, y = Average20182019), colour = "blue")
+```
+
+
+
+```{r}
+covid_data <- read_csv(here::here("../raw_data/actual_covid_cases.csv"))
+```
+
+
+```{r}
+a <- covid_data %>% 
+  filter(HBName == "Scotland") %>% 
+  mutate(Date = ymd(Date),
+         week_ending = ceiling_date(Date, "week")) %>% 
+  group_by(week_ending) %>% 
+  summarise(HospitalAdmissions_weekly = sum(HospitalAdmissions)) 
+# %>% 
+#  ggplot() +
+ # geom_line(aes(x = week_ending, y = HospitalAdmissions_weekly))
+```
+
+
+
+
+```{r}
+ggplot() +
+  geom_line(aes(x = a$week_ending, y = a$HospitalAdmissions_weekly)) +
+  geom_line(aes(x = b$WeekEnding, y = b$NumberAdmissions))
+```
+
+
+```{r}
+read_csv(here::here("../raw_data/trend_agesex_20221116.csv")) %>% 
+    left_join(codes, by = c("Country" = "HB")) %>% 
+    select(1:2, Country, "country_name" = HBName, everything()) %>% 
+    clean_names() %>% 
+    mutate(week_ending = ymd(week_ending))
+```
+
+```{r}
+read_csv(here::here("../clean_data/daily_covid_health_board.csv"))
+```
+

@@ -1,0 +1,193 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+nhs_bed_occupancy %>% 
+  filter(location_name %in% health_boards)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+age_sex <- read_csv("../../clean_data/nhs_age_sex.csv")
+```
+
+```{r}
+age_sex %>% 
+  distinct(sex)
+```
+
+```{r}
+age_sex %>% 
+        filter(location_name == "Scotland",
+               str_detect(quarter, "201[7-9]"),
+               admission_type == "All Inpatients and Day cases") %>%
+        group_by(quarter, sex) %>% 
+        summarise(stays = sum(stays)) %>% 
+        ggplot() +
+        geom_line(aes(x = quarter, y = stays, colour = sex, group = sex)) +
+        scale_y_continuous(limits = c(0, NA))
+```
+
+```{r}
+deprivation <- read_csv("../../clean_data/nhs_deprivation.csv")
+```
+
+
+```{r}
+deprivation %>% 
+        drop_na(simd) %>% 
+        filter(location_name == "Scotland",
+               str_detect(quarter, "201[7-9]"),
+               admission_type == "All Inpatients and Day cases") %>%
+        group_by(quarter, simd) %>% 
+        summarise(stays = sum(stays)) %>% 
+        ggplot() +
+        geom_line(aes(x = quarter, y = stays, colour = simd, group = simd)) +
+        scale_y_continuous(limits = c(0, NA))
+
+deprivation %>% 
+  distinct(simd)
+```
+
+```{r}
+age_sex %>% 
+  distinct(age)
+```
+
+
+
+```{r}
+library(readxl)
+
+ages_scotland <- read_excel(here::here("../../raw_data/scpppsumpop16.xls"), sheet = 3, skip = 5)
+
+library(janitor)
+
+```
+
+```{r}
+ages_scotland_pop <- ages_scotland %>% 
+  select(Ages, 3:7) %>% 
+  mutate(across(.cols = 2:6,
+                .fns = as.numeric)) %>% 
+  drop_na() %>% 
+  mutate(age = case_when(
+    Ages %in% c("0-4", "5-9") ~ "0-9 years",
+    Ages %in% c("10-14", "15-19") ~ "10-19 years",
+    Ages %in% c("20-24", "25-29") ~ "20-29 years",
+    Ages %in% c("30-34", "35-39") ~ "30-39 years",
+    Ages %in% c("40-44", "45-49") ~ "40-49 years",
+    Ages %in% c("50-54", "55-59") ~ "50-59 years",
+    Ages %in% c("60-64", "65-69") ~ "60-69 years",
+    Ages %in% c("70-74", "75-79") ~ "70-79 years",
+    Ages %in% c("80-84", "85-89") ~ "80-89 years",
+    Ages == "All ages" ~ "All ages",
+    TRUE ~ "90 years and over"
+  )) %>%
+  clean_names() %>% 
+  group_by(age) %>% 
+  summarise(x2017 = sum(x2017)*1000,
+            x2018 = sum(x2018)*1000,
+            x2017 = sum(x2019)*1000,
+            x2020 = sum(x2020)*1000,
+            x2021 = sum(x2021)*1000)
+
+```
+
+```{r}
+write_csv(ages_scotland_pop, here::here("../../clean_data/population_age_demographics"))
+```
+
+
+
+```{r}
+age_sex %>% 
+        filter(location_name %in% c("Scotland", "NHS Fife"),
+               str_detect(quarter, "201[789]"),
+               admission_type == "All Inpatients and Day cases") %>%
+        group_by(quarter, location_name, age) %>% 
+        summarise(stays = sum(stays))
+```
+
+```{r}
+hb_pops <- read_csv(here::here("../../raw_data/healthboard_pop_est.csv"))
+```
+
+```{r}
+hb_pop_formatted <- hb_pops %>% 
+  clean_names() %>% 
+  filter(year %in% c(2017, 2018, 2019, 2020, 2021)) %>% 
+  pivot_longer(7:98, names_to = "Ages", values_to = "pop") %>% 
+  mutate(age = case_when(
+    Ages %in% c("age0", "age1", "age2", "age3", "age4", "age5", "age6", "age7", "age8", "age9") ~ "0-9 years",
+    Ages %in% c("age10", "age11", "age12", "age13", "age14", "age15", "age16", "age17", "age18", "age19") ~ "10-19 years",
+    Ages %in% c("age20", "age21", "age22", "age23", "age24", "age25", "age26", "age27", "age28", "age29") ~ "20-29 years",
+    Ages %in% c("age30", "age31", "age32", "age33", "age34", "age35", "age36", "age37", "age38", "age39") ~ "30-39 years",
+    Ages %in% c("age40", "age41", "age42", "age43", "age44", "age45", "age46", "age47", "age48", "age49") ~ "40-49 years",
+    Ages %in% c("age50", "age51", "age52", "age53", "age54", "age55", "age56", "age57", "age58", "age59") ~ "50-59 years",
+    Ages %in% c("age60", "age61", "age62", "age63", "age64", "age65", "age66", "age67", "age68", "age69") ~ "60-69 years",
+    Ages %in% c("age70", "age71", "age72", "age73", "age74", "age75", "age76", "age77", "age78", "age79") ~ "70-79 years",
+    Ages %in% c("age80", "age81", "age82", "age83", "age84", "age85", "age86", "age87", "age88", "age89") ~ "80-89 years",
+    Ages == "all_ages" ~ "All ages",
+    TRUE ~ "90 years and over"
+  )) %>% 
+  group_by(hb, sex, age, year) %>% 
+  summarise(population = sum(pop)) %>% 
+  ungroup()
+
+hb_pop_formatted %>% 
+  distinct(hb)
+
+write_csv(hb_pop_formatted, here::here("../../clean_data/hb_pop_formatted.csv"))
+
+?pivot_longer
+```
+
+```{r}
+age_sex %>% 
+  mutate(year = as.numeric(str_extract(quarter, "[0-9]{4}"))) %>% 
+  filter(location_name %in% regions,
+         year != 2016) %>% 
+  left_join(hb_pop_formatted, by = c("year", "age", "sex", "location_code" = "hb")) %>% 
+  mutate(population = population / 1000) %>% 
+  filter(location_name == "Scotland",
+         admission_type == "All Inpatients and Day cases") %>% 
+  group_by(quarter, location_name, age) %>% 
+  summarise(stays = sum(stays),
+            population = sum(population),
+            stays_per_1000 = stays / population) %>% 
+  ggplot() +
+  geom_line(aes(x = quarter, y = stays_per_1000, group = age, colour = age))
+  
+```
+
+```{r}
+age_sex %>% 
+  mutate(year = as.numeric(str_extract(quarter, "[0-9]{4}"))) %>% 
+  filter(location_name %in% regions,
+         year != 2016) %>% 
+  left_join(hb_pop_formatted, by = c("year", "age", "sex", "location_code" = "hb")) %>% 
+  mutate(population = population / 1000) %>% 
+  filter(location_name == "Scotland",
+         admission_type == "All Inpatients and Day cases") %>% 
+  group_by(quarter, location_name, sex) %>% 
+  summarise(stays = sum(stays),
+            population = sum(population),
+            stays_per_1000 = stays / population) %>% 
+  ggplot() +
+  geom_line(aes(x = quarter, y = stays_per_1000, group = sex, colour = sex))
+```
+
+```{r}
+nhs_stays_hb %>% 
+      filter(location_name %in% c("Scotland", "Borders"),
+             str_detect(quarter, "201[7-9]"),
+             admission_type == "All Inpatients and Day cases") %>%
+        group_by(location_name, quarter) %>% 
+        summarise(spells = sum(spells))
+```
+

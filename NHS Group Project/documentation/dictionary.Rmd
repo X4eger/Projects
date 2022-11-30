@@ -1,0 +1,75 @@
+---
+title: "Dictionary for non-technical audience"
+author: "Manuela Mastrogiovanni"
+date: "2022-11-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1. Secondary Care  
+
+Secondary care **includes**:  
+- planned or elective care, usually in a hospital  
+- mental health care   
+- urgent and emergency care, such as:    
+
+  - 999 and 111 services  
+  - ambulance services  
+  - hospital emergency departments  
+  - out-of-hours GP services  
+  
+ 
+([link](https://digital.nhs.uk/developer/guides-and-documentation/introduction-to-healthcare-technology/the-healthcare-ecosystem#:~:text=Secondary%20care%20includes%3A,mental%20health%20care) to source)  
+
+### 2. Acute Hospital Care  
+
+_‘Acute’_ hospital care includes activity occurring in major teaching hospitals, district general hospitals and community hospitals.  
+
+**Includes**:  
+- services such as consultation with specialist clinicians  
+- emergency treatment  
+- routine, complex and life-saving surgery  
+- specialist diagnostic procedures  
+- close observation  
+- short-term care of patients   
+
+**Excludes**:  
+- obstetric services  
+- psychiatric services  
+- long-stay care services  
+- non-consultant-led clinics  
+
+([link](https://publichealthscotland.scot/publications/acute-hospital-activity-and-nhs-beds-information-quarterly/acute-hospital-activity-and-nhs-beds-information-quarterly-quarter-ending-31-december-2021/glossary/) to source)
+
+
+### 3. Elective Admission  
+
+An elective (or planned) admission is when a patient has been given a date to come to hospital for a planned procedure or treatment.  
+
+([link](https://publichealthscotland.scot/publications/acute-hospital-activity-and-nhs-beds-information-quarterly/acute-hospital-activity-and-nhs-beds-information-quarterly-quarter-ending-31-december-2021/glossary/) to source)
+
+
+### 4. All available staffed beds
+
+An available staffed bed is a bed that can be used for an inpatient or day case care.  
+All available staffed beds = allocated  beds + borrowed  beds – lent beds + temporary  beds  
+
+([link](https://publichealthscotland.scot/publications/acute-hospital-activity-and-nhs-beds-information-quarterly/acute-hospital-activity-and-nhs-beds-information-quarterly-quarter-ending-31-december-2021/glossary/) to source)
+
+
+### 5. Scottish Index of Multiple Deprivation (SIMD)
+
+The SIMD uses a wide range of information for small areas (data zones) to identify concentrations of multiple deprivation across Scotland.  
+It is a relative measure of deprivation across 6,976 small areas (called data zones). If an area is identified as _‘deprived’_, this can relate to people having a low income but it can also mean fewer resources or opportunities. SIMD looks at the extent to which an area is deprived across seven domains:  
+- income  
+- employment  
+- education  
+- health  
+- access to services  
+- crime  
+- housing
+
+([link](https://www.gov.scot/collections/scottish-index-of-multiple-deprivation-2020/) to source)

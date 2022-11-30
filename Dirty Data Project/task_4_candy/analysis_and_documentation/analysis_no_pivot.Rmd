@@ -1,0 +1,279 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# Libraries
+```{r}
+library(readr)
+library(here)
+library(tidyverse)
+```
+
+# Read in the relevant files
+```{r}
+candy_2015 <- read_csv(here::here("clean_data/candy_2015.csv"))
+candy_2016 <- read_csv(here::here("clean_data/candy_2016.csv"))
+candy_2017 <- read_csv(here::here("clean_data/candy_2017.csv"))
+
+```
+
+# Combine all dataframes into one hideous frame
+
+```{r}
+candy_master <- bind_rows(candy_2015, candy_2016, candy_2017)
+names(candy_master)
+# Looking at names there should be some manual renaming for easier use
+
+candy_master <- candy_master %>% 
+  rename(
+    pb_kisses = 
+      anonymous_brown_globs_that_come_in_black_and_orange_wrappers,
+    full_size_candy = any_full_sized_candy_bar,
+    other_brach_products = brach_products_not_including_candy_corn,
+    restaurant_free_candy = 
+      candy_that_is_clearly_just_the_stuff_given_out_for_free_at_restaurants,
+    currency = cash_or_other_forms_of_legal_tender,
+    toblerone = tolberone_something_or_other,
+    chick_o_stick = chick_o_sticks_we_don_t_know_what_that_is,
+    mm_circ_peanututs = those_odd_marshmallow_circus_peanut_things,
+    poi_season3 = 
+      person_of_interest_season_3_dvd_box_set_not_including_disc_4_with_hilarious_outtakes,
+    sourpatch_kids = sourpatch_kids_i_e_abominations_of_nature,
+    vials_of_syrup = 
+      vials_of_pure_high_fructose_corn_syrup_for_main_lining_into_your_vein
+    )
+
+names(candy_master)
+
+# Relocate country so its near the start of the data frame
+candy_master <- candy_master %>% 
+  relocate(country, .after = age) %>% 
+  relocate(gender, .after = age) %>% 
+  select(-state)
+    
+```
+
+# Tackling country column
+
+```{r}
+candy_master %>% 
+  select(year, country, state)
+
+```
+
+# Initally looking at the data, 2015 has no data for country or state
+ Initially while sorting through country/state filtering out all 2015 
+ entries will be easiest. Using state can be helpful if country is NA 
+ but state isn't. Once all country entries have been sorted we can drop 
+ state altogether as it isn't relevant to any questions
+ 
+```{r}
+
+# Use filter and select to create a string we can use to uniform all entries
+candy_master %>% 
+  distinct(country)
+```
+ 
+# Create some variables that we can use for organizing entries, these can be 
+  used for multiple years and we can add as we check other years entries
+
+```{r}
+
+pattern_usa <- c(
+      "usa", "US", "USA", "United States of America", "uSA", "united states", 
+      "United States", "us", "USSA", "U.S.A", "Murica", "USA!", "Usa", "U.S.", 
+      "Us", "America", "Units States", "United states", "USA USA USA", 
+      "the best one - usa", "USA! USA! USA!", "u.s.", 
+      "The Yoo Ess of Aaayyyyyy", "united states of america", "USA!!!!!!", 
+      "USA! USA!", "United Sates", "Sub-Canadian North America... 'Merica", 
+      "Trumpistan", "U.s.", "Merica", "UNited States", "United Stetes", 
+      "america", "USA USA USA USA", "United State", "god's country",
+      "USA (I think but it's an election year so who can really tell)", "U.S.A.",
+      "Unhinged states","USAUSAUSA", "United staes", "u.s.a.", "USAUSAUSA", 
+      "United States of America", "US of A", "unhinged states", "Unites States",
+      "The United States", "North Carolina", "Unied States", "U S", 
+      "The United States of America", "unite states", "USA? Hard to tell anymore..",
+      "'merica", "usas", "Pittsburgh", "New York", "California", "USa", 
+      "I pretend to be from Canada, but I am really from the United States.", 
+      "United Stated", "Ahem....Amerca", "New Jersey", "United ststes", 
+      "United Statss", "murrika", "USAA", "Alaska", "united States", "u s a",
+      "United Statea", "united ststes", "USA USA USA!!!!", "EUA", "United States of America"
+)
+
+pattern_uk <- c("UK", "england", "uk", "United Kingdom", "England","United Kindom",
+                "U.K.", "Uk", "Scotland", "endland", "United kingdom")
+
+pattern_canada <- c("Canada", "canada", "Canada`", "CANADA", "soviet canuckistan"
+                    )
+
+pattern_other <- c("Japan", "france", "A tropical island south of the equator", 
+                   "Switzerland", "Neverland", "this one", "Korea","belgium", 
+                   "croatia", "Portugal", "españa", "Panama",
+                   "there isn't one for old men", "one of the best ones", "France",
+                   "Australia", "hungary", "Austria", "Somewhere", "New Zealand",
+                   "Germany", "Mexico", "Brasil", "South Korea", 
+                   "Philippines", "sweden", "The Netherlands", "Finland", "China",
+                   "germany", "See above", "kenya", "Netherlands", "Not the USA or Canada",
+                   "netherlands", "Denial", "UAE", "finland", "Europe", "Earth", 
+                   "Costa Rica", "insanity lately","The republic of Cascadia", 
+                    "Cascadia", "cascadia", "Greece", "australia", "A", "Can",
+                   "Canae", "Ireland", "South africa", "Iceland", "Denmark", "UD",
+                   "Indonesia", "Atlantis", "N. America", "Singapore", "Taiwan", 
+                   "hong kong", "spain", "Sweden", "Hong Kong", "Narnia", 
+                   "subscribe to dm4uz3 on youtube", "I don't know anymore",
+                   "Fear and Loathing", "46", "45.0", "45", "44.0", "35", "32",
+                   "30.0", "1")
+
+#Added the ages to the other column, if I have time i would like to change them
+# to countries depending on state entered
+```
+
+# Use created variables to filter and organise the country column
+```{r}
+
+candy_master$country[candy_master$country %in% pattern_usa] <- "USA"
+candy_master$country[candy_master$country %in% pattern_uk] <- "UK"
+candy_master$country[candy_master$country %in% pattern_canada] <- "Canada"
+candy_master$country[candy_master$country %in% pattern_other] <- "Other"
+# TO DO: Expand filters for all years
+#        Save variables into seperate notepad doc and write them in
+
+candy_master %>% 
+  group_by(country) %>% 
+  count() %>% 
+  arrange(desc(country))
+
+```
+ 
+ 
+# Sorting the age column
+
+```{r}
+#remove the decimal points and change to numeric to remove characters etc
+candy_master <- candy_master %>% 
+  mutate(age = str_replace(age, "\\..*", "")) %>%
+  mutate(age = as.numeric(age)) %>%
+  arrange(desc(age))
+
+# This will remove at least one entry that had an age plus some other words,
+# if time return and modify
+
+#replace all values that are unlikely with 0
+candy_master$age[candy_master$age > 120] <- 0
+
+#Check it worked
+candy_master %>% 
+  distinct(age)
+
+
+
+```
+
+## 1.4.2 Analysis questions
+
+# 1 What is the total number of candy ratings given across the three years. 
+(Number of candy ratings, not the number of raters. Don’t count missing values)
+
+```{r}
+
+# So we need to count each candy column and how many entries each has that aren't
+# NA value then combine each columns total, would this include the non candy
+# answers like the DVD's?
+names(candy_master)
+
+q1_candy_ratings <- candy_master %>%
+  select(6:128)#select the columns that are to do with ratings and save them
+
+# Initial plan was to count the na's then sub from the total
+
+sum(is.na(q1_candy_ratings)) # total NA's 396711
+
+# Can simply just count how many entries there are that are not NA
+total_candy_ratings <- sum(!is.na(q1_candy_ratings))
+
+# 771,914 Candy Ratings over the years
+
+```
+
+# 2 What was the average age of people who are going out trick or treating?
+
+```{r}
+
+candy_master %>% 
+  filter(trick_or_treating == "Yes") %>% 
+  mutate(average_age = mean(age, na.rm = TRUE)) %>% 
+  select(average_age)
+
+#average age was 33.6
+
+```
+
+# 3 What was the average age of people who are not going trick or treating?
+
+```{r}
+candy_master %>% 
+  filter(trick_or_treating == "No") %>% 
+  mutate(average_age = mean(age, na.rm = TRUE)) %>% 
+  select(average_age)
+
+# Average age 37.9
+```
+
+# 4 For each of joy, despair and meh, which candy bar received the most of these ratings?
+
+```{r}
+
+q4_candy <- candy_master %>% 
+  select(6:128)
+
+q4_candy %>% 
+ summarise(across(everything(), .fns = ~str_count(., pattern = "JOY"))) %>% 
+  summarise(across(everything(), .fns = ~sum(., na.rm = TRUE))) %>% 
+      pivot_longer(
+        cols = everything(),
+        names_to = "candy_type",
+        values_to = "rating") %>% 
+  arrange(desc(rating))
+
+# Full Size Candy Bars received the most Joy ratings
+  
+q4_candy %>% 
+ summarise(across(everything(), .fns = ~str_count(., pattern = "DESPAIR"))) %>% 
+  summarise(across(everything(), .fns = ~sum(., na.rm = TRUE)))  %>%  
+  pivot_longer(
+    cols = everything(),
+    names_to = "candy_type",
+    values_to = "rating") %>%
+  arrange(desc(rating))
+
+# Broken Glow Sticks received the most despair ratings
+
+q4_candy %>% 
+ summarise(across(everything(), .fns = ~str_count(., pattern = "MEH"))) %>% 
+  summarise(across(everything(), .fns = ~sum(., na.rm = TRUE))) %>% 
+    pivot_longer(
+    cols = everything(),
+    names_to = "candy_type",
+    values_to = "rating") %>% 
+  arrange(desc(rating))
+
+# Lollipops received the most meh ratings
+
+```
+
+#Q5 How many people rated Starburst as despair?
+
+```{r}
+# Using method from previous answer and filtering we can easily find this
+q4_candy %>% 
+ summarise(across(everything(), .fns = ~str_count(., pattern = "DESPAIR"))) %>% 
+  summarise(across(everything(), .fns = ~sum(., na.rm = TRUE)))  %>%  
+  pivot_longer(
+    cols = everything(),
+    names_to = "candy_type",
+    values_to = "rating") %>%
+  filter(candy_type == "starburst")
+  
+# 1990 people voted starburst with despair
+```
+

@@ -1,0 +1,395 @@
+---
+title: "NYC Citi Bikes Report"
+author: "Gareth Sinclair"
+date: "2022-11-16"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(tsibbledata)
+library(tsibble)
+library(lubridate)
+library(jsonlite)
+library(leaflet)
+library(sf)
+
+bikes_data <- tsibbledata::nyc_bikes
+
+bikes_data <- bikes_data %>% 
+  mutate(year = year(start_time),
+         month = month(start_time, label = TRUE, abbr = FALSE),
+         day = wday(start_time, label = TRUE, abbr = FALSE),
+         day_of_month = mday(start_time),
+         start_hod = strftime(round_date(bikes_data$start_time, "30 minutes"),
+                              format= "%H:%M",
+                              tz = "America/New_York"),
+         end_hod = strftime(round_date(bikes_data$stop_time, "30 minutes"), 
+                              format= "%H:%M",
+                              tz = "America/New_York"))
+
+bikes_data <- bikes_data %>% 
+  mutate(ride_duration = as.numeric(as.duration(stop_time - start_time), "minutes")) %>% 
+  mutate(ride_duration = round(ride_duration, digits = 2))
+
+bikes_data <- bikes_data %>% 
+  mutate(rider_age = year - birth_year)
+
+```
+
+
+## Documentation
+
+### Domain knowledge
+
+Citi Bike is a company that offers an incredible bike share program across over 1,500 stations spread across New York, including the boroughs of Brooklyn, Queens, the Bronx, Hoboken, Manhattan and Jersey City. This report in particular will be focusing on Jersey City and it's surrounding area. 
+
+The Citi Bike App allows its users to travel in an environmentally friendly and cost effective method that also offers an excellent form of exercise. 
+
+As the world changes, an increasing number of cities across the world are adopting similar bike or scooter share programs, Citi Bike has already managed to create a solid foothold in New York and is steadily expanding to cover more of the surrounding area. It's pricing models are competitive with other means of transport and even offers discounted rates to the less fortunate so that everyone is able to benefit from its services. 
+
+### Business Requirements
+
+In order to fully understand the data set I plan to check the data set for any potential trends within that would enable me to identify where there is room for potential new avenues of revenue as well.
+
+### Business processes and data flow
+
+```{r, echo = FALSE}
+knitr::include_graphics("/CodeClan/PDA_Gareth_Sinclair/week_07/nyc_bikes_data_flow.png")
+
+```
+
+### Data visualisation as a tool for decision-making
+
+The goal of this report is to enable Citi Bikes to be able to easily demonstrate their key demographics and any potential areas of improvement of revenue that can be gained from this. 
+
+### Data types
+
+The original data types within the data set are:
+
+Factor: bike_id, start_station, end_station, type, gender  
+DATETIME: start_time, stop_time  
+Double: start_lat, start_long, end_lat, end_long, birth_year
+
+### Data quality and data bias
+
+Having looked at the data set and investigated the layout, I am concerned that the age and gender spread within the sample is insufficient to provide a fair and accurate representation of the population that uses the app. As there are multiple ways of being a subscriber, for any further analysis to take place around costs and profit/loss, this additional information is a must. 
+
+This data contains information from over 4000 journeys taken over the year of 2018, for any potential forecasting requirements or in depth trend analysis, additional information over multiple years would be preferred. 
+
+## Business Questions
+
+In this report I will be answering the following questions:
+
+  1. What is the pattern of bike hires over time?
+  2. Do bike hire patterns differ between bike rider demographics?
+  3. What is the geographical spread of the start points of bike hires?
+  4. Any other insights?
+  
+A forecast has not been included, as previously stated I do not believe there is sufficient data to give a relevant or insightful forecast. 
+  
+
+### What is the pattern of bike hires over time?
+
+When looking at the total hires by month, as perhaps expected, the summer months which are traditionally warmer with better weather are far more popular for bike hire. 
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+bikes_data %>% 
+  ggplot(aes(x = fct_rev(month)))+
+  geom_histogram(stat = "count", fill = "#6B7FBA")+
+  labs(
+    x = "Months",
+    y = "Total Bike Rentals",
+    title = "Bike Rentals by Month for 2018"
+      )+
+  coord_flip()+
+  theme_classic()
+
+```
+
+
+
+Whereas when we look at the difference in hires by day, the days of the week are more popular than the weekends, this would suggest that the bikes are _slightly_ more popular for commuters during the week.
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+bikes_data %>% 
+  ggplot(aes(x = fct_shift(fct_rev(day), -1)))+
+  geom_histogram(stat = "count", fill = "#6B7FBA")+
+  labs(
+    x = "Months",
+    y = "Total Bike Rentals",
+    title = "Bike Rentals by Day for 2018"
+      )+
+  coord_flip()+
+  theme_classic()
+```
+
+
+When looking closer to the average time of day that bikes are hired, it becomes apparent that the main demographic of users are using the bikes in order to aid with their commute.
+
+As you can see in these graphs, the peak times for bike hires coincide with the standard peak commuter time. They also show a clear difference between customers who are using the bikes as a one off compared with subscribers. 
+
+
+
+```{r, echo= FALSE, warning = FALSE, fig.show='hold', out.width='50%'}
+
+  bikes_data %>% 
+    ggplot(aes(x = start_hod, group = type, colour = type))+
+    geom_line(stat = "count", size = 1)+
+    labs(
+      x = "Journey Start Times",
+      y = "Number of Journeys",
+      title = "Journey Start Times"
+    )+
+  theme_classic()+
+  scale_color_manual(values = c("#6B7FBA", "#9859AB"))+
+   guides(colour = guide_legend(title = "User Type"))+
+    scale_x_discrete(
+      breaks = c("00:00","03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"))
+
+  bikes_data %>% 
+    ggplot(aes(x = end_hod, group = type, colour = type))+
+    geom_line(stat = "count", size = 1)+
+    labs(
+      x = "Journey End Times",
+      y = "Number of Journeys",
+      title = "Journey End Times"
+    )+
+  theme_classic()+
+  scale_color_manual(values = c("#6B7FBA", "#9859AB"))+
+   guides(colour = "none")+
+    scale_x_discrete(
+      breaks = c("00:00","03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"))
+  
+
+```
+
+
+
+### Do bike hire patterns differ between bike rider demographics?
+
+The key demographics that have been provided in the sample data is the gender of participants as well as the year they are born. We can use this to check if there is any difference between genders that use the bike share, as well as the average age of riders. 
+
+Initially, when comparing the gender proportion we can see that the proportion of males in the sample is 71.9%. This would imply that there are almost twice as many male users, however due to the sample size I would want to gain more information before stating this with confidence. 
+
+
+```{r, echo = FALSE, warning = FALSE}
+bikes_data %>% 
+  ggplot(aes(x = fct_rev(month), fill = gender))+
+  geom_histogram(stat = "count", position = "dodge")+
+  labs(
+    x = "Months",
+    y = "Number of users",
+    title = "Citi Bike User by Gender"
+  )+
+  coord_flip()+
+  theme_classic()+
+  scale_fill_manual(values = c("grey40", "#6B7FBA", "#3DA4CA"))+
+  guides(fill = guide_legend(title = "Gender"))
+```
+
+
+Having already seen that the average user hires bikes for their commute, we can predict the age range will be for standard workers. However thanks to the year born of users we can accurately see their age as well as the range. The average age is higher than originally anticipated when starting the project, however it does make fit when compared with the initial patterns that are being shown. 
+
+**Note:** When checking ages this way it does create some anomalies that have been removed, there are 2 users in their 130's which seemed unlikely.
+
+
+
+```{r, warning = FALSE, message=FALSE, echo = FALSE}
+bikes_data %>% 
+  ggplot(aes(x = rider_age, fill = type))+
+  geom_histogram(colour = "white", position = "dodge")+
+  geom_vline(xintercept = median(bikes_data$rider_age),
+             col = "firebrick",
+             lwd = 1) +
+  annotate("text",
+           x = median(bikes_data$rider_age) * 1.28,
+           y = median(bikes_data$rider_age) * 13.5,
+           label = paste("Average Rider Age : ", median(bikes_data$rider_age)),
+           col = "firebrick",
+           size = 3
+           )+
+  labs(
+    x = "Age of User",
+    y = "Number of Users",
+    title = "User age range"
+  )+
+  theme_classic()+
+    scale_fill_manual(values = c("#3DA4CA", "#6B7FBA"))+
+  guides(fill = guide_legend(title = "Type of User"))+
+  xlim(20, 75)+
+  ylim(0, 480)
+```
+
+
+### What is the geographical spread of the start points of bike hires?
+
+
+Having initially looked at the location of the start points for bike hires, the stations with the highest usage are primarily in residential areas. 
+
+In the below visualization we can see that the green markers that are indicating the most popular start stations are all focused in residential areas. 
+
+Whereas the blue markers that are indicating most used end stations, most are next to further transportation hubs such as ferry terminal, bus terminal and train station. 
+
+
+
+```{r, message = FALSE, warning=FALSE, echo = FALSE}
+bikes_data %>%
+  filter(
+    start_station %in% c("3203", "3213", "3267", "3269", "3186"),
+    end_station %in% c("3186", "3183", "3195", "3202", "3639")) %>% 
+  leaflet() %>% 
+  addTiles() %>% 
+  addCircleMarkers(
+    color = "green",
+    lat = ~unique(start_lat),
+    lng = ~unique(start_long),
+    popup = ~unique(start_station)
+  )%>%
+  addCircleMarkers(
+    color = "blue",
+    lat = ~unique(end_lat),
+    lng = ~unique(end_long),
+    popup = ~unique(end_station)
+  ) %>% 
+  addLegend(
+    title = "Most Frequently used Stations",
+    position = "bottomleft",
+    colors = c("green", "blue"),
+    labels = c("Start Stations", "End Stations")
+  )
+```
+
+### Final Insights
+
+Having looked at the data and the different trends that are beginning to appear, before making any further decisions I would be looking to get more information, ideally from multiple years. In order to get the most out of any potential additional data we will need to consider the implications of how the data could be used, this information allows us to identify when and where large amounts of people could be throughout the day which could be used to the advantage of criminal or terrorist activities. If we were to add in distance tracking then it could lead to individual customers being tracked and monitored if there was a breach. 
+
+However initial insights would be that the majority of users of Citi Bikes are using it for getting from their home to another means of transport, with a peak in usage during the summer when the weather is better. 
+
+As the current membership option is only annual, I believe this is where changes can be made. 
+
+A 3 month membership could be trialed. If it was priced cheaper than the annual membership but more expensive when used consecutively you could further increase the volume of users in the summer to those that weren't prepared to pay for usage during the winter. 
+
+If you have any additional questions or would like to discuss anything that has been mentioned in more detail, please do ask. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<details>
+<summary> **Extra Time** </summary>
+
+<details>
+<summary> **Hires by days of the year**</summary>
+```{r, echo = FALSE, warning = FALSE}
+
+bikes_data %>%
+  ggplot(aes(x = fct_shift(fct_rev(day), -1)))+
+  geom_histogram(stat = "count", fill = "#6B7FBA")+
+  labs(
+    x = "Weekdays",
+    y = "Total Bike Rentals",
+    title = "Bike Rentals by Day for 2018"
+      )+
+  coord_flip()+
+  facet_wrap(~month)+
+  theme_classic()
+
+
+```
+</details>
+
+<details>
+<summary> **Average Ride Durations**</summary>
+```{r, echo = FALSE, warning=FALSE, fig.show='hold', out.width='50%'}
+bikes_data %>% 
+  filter(type == "Subscriber") %>% 
+  index_by(month) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = fct_rev(month), y = avg_ride_duration))+
+  geom_col(fill = "#6B7FBA")+
+  labs(
+    x = "Month",
+    y = "Average Duration of Hire (minutes)",
+    title = "Average duration of bikes hired by Subscribers"
+  )+
+  coord_flip()+
+  theme_classic()
+
+bikes_data %>% 
+  filter(type == "Customer") %>% 
+  index_by(month) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = fct_rev(month), y = avg_ride_duration))+
+  geom_col(fill = "#3DA4CA")+
+  labs(
+    x = "Month",
+    y = "Average Duration of Hire (minutes)",
+    title = "Average duration of bikes hired by Customers"
+  )+
+  coord_flip()+
+  theme_classic()
+```
+<details>
+  - <summary>**Less than 45 minutes**</summary>
+
+```{r, echo = FALSE, warning=FALSE, fig.show='hold', out.width='50%'}
+bikes_data %>% 
+  filter(ride_duration <= 45) %>% 
+  filter(type == "Subscriber") %>% 
+  index_by(month) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = fct_rev(month), y = avg_ride_duration))+
+  geom_col(fill = "#6B7FBA")+
+  labs(
+    x = "Month",
+    y = "Average Duration of Hire (minutes)",
+    title = "Average duration of bikes hired by Subscribers"
+  )+
+  coord_flip()+
+  theme_classic()
+
+bikes_data %>% 
+  filter(ride_duration <= 45) %>% 
+  filter(type == "Customer") %>% 
+  index_by(month) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = fct_rev(month), y = avg_ride_duration))+
+  geom_col(fill = "#3DA4CA")+
+  labs(
+    x = "Month",
+    y = "Average Duration of Hire (minutes)",
+    title = "Average duration of bikes hired by Customers"
+  )+
+  coord_flip()+
+  theme_classic()
+```
+
+</details>
+</details>
+
+
+</details>
+
+
+<br>
+<br>
+<br>

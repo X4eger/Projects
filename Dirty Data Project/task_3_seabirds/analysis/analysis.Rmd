@@ -1,0 +1,134 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(readr)
+library(readxl)
+library(here)
+library(tidyverse)
+library(rebus)
+
+bird_data <- read_csv(here::here("clean_data/clean_bird_data.csv"))
+ship_data <- read_csv(here::here("clean_data/clean_ship_data.csv"))
+
+```
+
+# Now that both clean data files are read in we can join them for initial view
+
+```{r}
+seabirds_data <- left_join(bird_data, ship_data, by = c("record_id" = "record_id"))
+
+
+```
+
+```{r}
+
+names(seabirds_data) 
+# note that record.x and record.y have been created 
+# from the join
+
+head(seabirds_data, 10) 
+# record y can be dropped as it is not a unique 
+# modifier for the table. 
+# record.x can be renamed to record
+
+seabirds_data <- seabirds_data %>% 
+  rename("record" = record.x) %>% 
+  select(!record.y)
+
+seabirds_data %>% 
+    summarise(across(.fns = ~sum(is.na(.))))
+
+seabirds_data %>% 
+  filter(is.na(lat))
+
+
+```
+
+# Looking at questions
+
+
+    Which bird had the most individual sightings?
+    Which bird had the highest total count?
+    Which bird had the highest total count above a latitude of -30?
+    How many different types of birds were only ever seen in groups of 1?
+    How many penguins were seen? (Hint: there are many types of penguin)
+
+
+#Q1 Which bird had the most individual sightings? 
+
+```{r}
+seabirds_data %>% 
+  group_by(species_common_name) %>% 
+  summarise(species_common_name, #get our required columns for the answer
+            species_scientific_name, 
+            species_abbreviation, 
+            total_sightings = n()) %>% # count in the groups for individual 
+                                       # sightings
+  distinct() %>% 
+  arrange(desc(total_sightings)) 
+
+# Wandering albatross sensu lato PL2 (Plummage stage)
+# Wandering albatross of various plummage stages very common
+```
+
+#Q2 Which bird had the highest total count?
+
+```{r}
+seabirds_data %>% 
+  group_by(species_common_name) %>% 
+  summarise(species_common_name, #get required columns for the answer
+            species_scientific_name, 
+         species_abbreviation, 
+         total_count = sum(count))%>%
+  distinct() %>% #filter to distinct names so we can see all the top results
+  arrange(desc(total_count))
+
+# Short-tailed Shearwater, 982553
+```
+
+#Q3 Which bird had the highest total count above a latitude of -30?
+
+```{r}
+seabirds_data %>% 
+  filter(lat > -30) %>%  # filter latitude column to only show counts higher than -30
+  group_by(species_common_name) %>% #group by bird type for accurate count
+  summarise(species_common_name, #get only the required columns for the answer
+            species_scientific_name, 
+            species_abbreviation, 
+            total_count = sum(count))%>% 
+  distinct() %>% #as we are doing a count we can filter to distinct names
+  arrange(desc(total_count))
+
+# Wedge tailed Shearwater
+```
+#Q4  How many different types of birds were only ever seen in groups of 1?
+
+```{r}
+seabirds_data %>% 
+  filter(count == 1) %>%  # filter the count column to only show rows with a 
+  # single count
+  distinct(species_common_name) %>% #show only distinct names in the column
+  count() # count how many are left after filter
+
+# 298 different types of birds
+
+```
+#Q5 How many penguins were seen? (Hint: there are many types of penguin)
+```{r}
+
+seabirds_data %>% 
+  str_detect("enguin") # Check to see if "enguin" will be enough for a catch all
+
+seabirds_data %>% 
+ filter(
+   grepl("enguin", species_common_name)) %>%  # filter by chosen word, not using
+  #regex as wasn't necessary
+  summarise(total_penguins = sum(count)) # get total count of remaining 
+ # rows count value
+
+#158 penguins
+```
+

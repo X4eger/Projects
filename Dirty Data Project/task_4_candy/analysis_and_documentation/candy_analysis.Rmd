@@ -1,0 +1,423 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+# Halloween Candy - A Dirty Data Story
+
+## Introduction
+
+In this report I will explain my approach to cleaning and analyzing the given Halloween candy data.  Starting with initial thoughts on the raw data as well as any challenges that were experienced while cleaning.  Following this I will then discuss analyzing the data in order to answer the required questions and what I found there as well as explaining my reasoning behind my approaches. I will also be commenting where relevant anything that I would do differently in the future and why. 
+
+### Initial Impressions
+
+When first looking at each data set the large volume of questions that have been asked is clear, with a lot of the questions seemingly being completely unrelated to the rest of the data. This was the first major note for future cleaning, identifying what information will be relevant for answering questions.  When comparing each data set it became clear that while they would need to be combined, there was not a set list of questions that had been used in order to allow for an easier comparison and that there would be a lot of restructuring of the data required to make it usable. In particular renaming would be very important ahead of combining everything.  Finally with the difference in questions for each year, being aware that this would create a large number of NA values when combining the different data sets together. 
+
+
+## Cleaning
+
+I split each data set into their own cleaning script in order to be able to tailor the script to the specifics of each data set. This allowed me to break the data down into smaller chunks where it was more manageable, removing all of the extra columns that weren't useful as well as renaming columns to something more concise.  Cleaning the data across all 3 years was done simultaneously as identifying the common factors between each of them was important in order to ensure that the columns would match during the bind.  
+
+The majority of the functions that were used for initial cleaning were __select__ and __rename__.  __Select__ was used to remove columns that weren't relevant and __rename__ to link up different columns ahead of the bind. __clean\_names__ from the *janitor* package was used once the columns had been reduced and before any renames in case it made changes to anything already renamed.   __Mutate__ and __coalesce__ was also used in order to change the *timestamp* column in two of the data sets as while the data being down to the second can be useful, in this instance I would only need the year. It was also used on the data set that didn't have a *timestamp* so that when binding they wouldn't have any NA values in the column. 
+
+One cleaning element of note was the challenge I found for renaming all of the columns in the 2017 data set as having to manually rename all of the questions didn't seem practical, the below __for__ loop shows the solution to this challenge. Looking back on this I would look at pivoting the questions into a single column and removing the regex expression in the column in order to avoid using a loop in the future. 
+
+```{r, eval = FALSE}
+
+for( col in 1:ncol(trim_2017_candy)){
+  
+  colnames(trim_2017_candy) <- 
+    sub("q[0-9]_", "", colnames(trim_2017_candy))
+}
+```
+
+***NOTE:*** I made the decision to not remove any NA values within the cleaning             scripts as I wanted to see how it impacted the data after creating              the bind. As the bind would create a lot more NA values with                    different column values the practical option would be to remove them             all at once if necessery. 
+
+## Analysis
+
+# Libraries
+Starting the analysis as with any other assignment, it is always important to create a space for loading any required libraries. In this instance the most useful libraries are readr & here for reading in the data as well as tidyverse for general use. 
+
+```{r, message=FALSE}
+library(readr)
+library(here)
+library(tidyverse)
+```
+
+
+
+# Reading and binding
+
+After reading in the libraries that would be used I read in each piece of data after it had been through the cleaning scripts and used __bind\_rows__ in order to combine everything together. A join function was not used as they had no unique identifiers. 
+
+```{r, message= FALSE}
+candy_2015 <- read_csv(here::here("clean_data/candy_2015.csv"))
+candy_2016 <- read_csv(here::here("clean_data/candy_2016.csv"))
+candy_2017 <- read_csv(here::here("clean_data/candy_2017.csv"))
+
+candy_master <- bind_rows(candy_2015, candy_2016, candy_2017)
+```
+
+# Analysis based cleaning
+
+Once the data was collected together the most important aspect I wanted to check was how the column names had been impacted and restructuring in order to make it more readable. Below is a summary of the further renaming as well as the relocating. Renaming started to become a rabbit hole, this could have been a much larger section but looking at the question requirements I moved on. 
+
+I relocated the country and gender columns to the start of the data as I wanted to get them out of the selection of questions when I would pivot in the future. The state column was also dropped as it would not be required, this could have been done in the cleaning scripts also prior to the bind. 
+
+```{r}
+# names(candy_master)
+# Looking at names there should be some manual renaming for easier use
+
+candy_master <- candy_master %>% 
+  rename(
+    pb_kisses = 
+      anonymous_brown_globs_that_come_in_black_and_orange_wrappers,
+    full_size_candy = any_full_sized_candy_bar,
+    other_brach_products = brach_products_not_including_candy_corn,
+    restaurant_free_candy = 
+      candy_that_is_clearly_just_the_stuff_given_out_for_free_at_restaurants,
+    currency = cash_or_other_forms_of_legal_tender,
+    toblerone = tolberone_something_or_other,
+    chick_o_stick = chick_o_sticks_we_don_t_know_what_that_is,
+    mm_circ_peanututs = those_odd_marshmallow_circus_peanut_things,
+    poi_season3 = 
+      person_of_interest_season_3_dvd_box_set_not_including_disc_4_with_hilarious_outtakes,
+    sourpatch_kids = sourpatch_kids_i_e_abominations_of_nature,
+    vials_of_syrup = 
+      vials_of_pure_high_fructose_corn_syrup_for_main_lining_into_your_vein
+    )
+
+# Relocate country and gender so its near the start of the data frame
+candy_master <- candy_master %>% 
+  relocate(country, .after = age) %>% 
+  relocate(gender, .after = age) %>% 
+  select(-state)
+# Recheck names and make sure that I am happy with the new layout
+# names(candy_master)
+
+```
+
+# Sorting the gender column
+
+As the gender column would be required for specific questions it was important to identify what it looked like and any potential changes to make. I chose not to change the NA values in gender to "Other" as that wouldn't technically be true, the data just hadn't been recorded at this time. 
+
+```{r, warning=FALSE}
+# Check what current entries there are in the gender column
+candy_master %>% 
+  select(gender) %>% 
+  distinct()
+
+# Chose to keep Other over "I'd rather not say" so changed all to match
+candy_master$gender[candy_master$gender == "I'd rather not say"] <- "Other"
+```
+
+# Sorting the age column
+
+The age column, as a sensitive subject to some of those surveyed, had a very wide range of answers with many being words or massive improbable numbers. All of the standalone numbers had a decimal point. A lot of the answers recorded were also an age with a physical comment. All of this fluff around the numerical values had to be removed. 
+
+```{r, warning=FALSE}
+
+#remove the decimal points and change to numeric to remove characters etc
+candy_master <- candy_master %>% 
+  #mutate(age = str_replace(age, "\\..*", "")) %>% #ignore as "as.integer"
+  #mutate(age = as.numeric(age))                  # does same job
+  mutate(age = as.integer(age))
+
+#replace all values that are unlikely with 0
+candy_master$age[candy_master$age > 120] <- 0
+#replacing all the 0 values to NA was useful as the 0's would impact the mean
+candy_master$age[candy_master$age == 0] <- NA
+
+#Check it worked
+# candy_master %>% 
+#  distinct(age)
+```
+
+# Sorting the country column
+
+In short, the country column was a complete disaster. The easiest but most time consuming method was to create a vector for each required option for the questions and use them to sort the column. This was done by manually going through all of the distinct values and adding them to the relevant vector. I decided to store the vectors externally and source them in as it tidied up the data while also being useful should a similar task be required in the future.
+
+```{r, warning = FALSE}
+
+source("country_lists.txt")
+
+candy_master$country[candy_master$country %in% pattern_usa] <- "USA"
+candy_master$country[candy_master$country %in% pattern_uk] <- "UK"
+candy_master$country[candy_master$country %in% pattern_canada] <- "Canada"
+candy_master$country[candy_master$country %in% pattern_other] <- "Other"
+
+# Checking for any other values to sort
+candy_master %>%
+  distinct(country)
+
+```
+
+
+# Pivot the data for easier filtering
+
+I decided to pivot the data after proceeding through all of the questions once and struggling against sorting through all of the columns to get answers, while possible it required a ***lot*** more work for the same answers as below.
+
+```{r}
+# Check the names of columns ahead of pivoting, identifying column numbers for the "cols" aspect of the pivot
+names(candy_master)
+
+# save as a new variable in case I want to go back and make any further changes to the master data
+candy_pivoted <- candy_master %>% 
+  pivot_longer(
+    cols = 6:128, # all of the candy question columns
+    names_to = "candy_type",
+    values_to = "rating"
+  )
+
+```
+
+## 1.4.2 Analysis Questions
+
+This section is where all of the questions are answered, I have commented in each code chunk some logic behind my code decisions and the outcomes, again any challenges faced are also commented.
+
+# Q1 What is the total number of candy ratings given across the three years. 
+(Number of candy ratings, not the number of raters. Don’t count missing values)
+
+```{r}
+
+#filter out all of the na ratings and count what is left
+candy_pivoted %>% 
+  filter(!is.na(rating)) %>% 
+  count()
+
+# 764705 ratings
+```
+
+
+# Q2 What was the average age of people who are going out trick or treating?
+```{r}
+
+# Filter the trick or treating to only have yes answers, work out the average 
+# age from the remaining columns
+candy_pivoted %>% 
+  filter(trick_or_treating == "Yes") %>% 
+  mutate(average_age = mean(age, na.rm = TRUE)) %>% 
+  select(average_age)
+
+# Could add a round function for visual presentation if required
+## 33.7
+
+```
+
+
+# Q3 What was the average age of people who are NOT going trick or treating?
+
+```{r}
+
+# Filter the trick or treating to only have no answers, work out the average 
+# age from the remaining columns
+candy_pivoted %>% 
+  filter(trick_or_treating == "No") %>% 
+  mutate(average_age = mean(age, na.rm = TRUE)) %>% 
+  select(average_age)
+
+# Could add a round function for visual presentation if required
+# 37.9
+
+```
+
+
+
+# Q4 For each of joy, despair and meh, which candy bar received the most of these ratings?
+
+```{r}
+
+#Most Joy Ratings
+candy_pivoted %>% 
+  filter(rating == "JOY") %>% 
+  group_by(candy_type) %>% 
+  count() %>% 
+  arrange(desc(n))
+# Full Sized Candy Bar
+
+# Most Despair Ratings
+candy_pivoted %>% 
+  filter(rating == "DESPAIR") %>% 
+  group_by(candy_type) %>% 
+  count() %>% 
+  arrange(desc(n))
+# Broken Glow Stick
+
+# Most Meh Ratings
+candy_pivoted %>% 
+  filter(rating == "MEH") %>% 
+  group_by(candy_type) %>% 
+  count() %>% 
+  arrange(desc(n))
+# Lollipops
+```
+
+# Q5 How many people rated Starburst as despair?
+
+```{r}
+# Filter to the rating required and candy type we are looking for and count the total
+candy_pivoted %>% 
+  filter(rating == "DESPAIR") %>%
+  filter(candy_type == "starburst") %>% 
+  count()
+
+# 1990 people rated starburst as despair, shame on them
+
+```
+
+
+***NOTE***: For everything after Q5, I worked out the answers by using a filter and repeating the code for each requirement. I then went back after understanding how to do this in one chunk of code and show all the answers required. I have kept in both versions to show a comparison betwee the two methods
+
+# For the next three questions, count despair as -1, joy as +1, and meh as 0.
+
+```{r, warning = FALSE}
+
+# Replace the words with numerical values
+candy_pivoted$rating[candy_pivoted$rating == "JOY"] <- 1
+candy_pivoted$rating[candy_pivoted$rating == "DESPAIR"] <- -1
+candy_pivoted$rating[candy_pivoted$rating == "MEH"] <- 0
+
+# make sure the column is numerical
+num_rated_candy <- candy_pivoted %>% 
+  mutate(rating = as.numeric(rating))
+
+```
+
+# Q6  What was the most popular candy bar by this rating system 
+ for each gender in the data set ?
+```{r}
+# This nicer method shows the same results with considerably less work
+num_rated_candy %>% 
+  group_by(gender, candy_type) %>% 
+  summarise(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  slice_max(popularity_score)
+
+```
+
+```{r}
+# Male gender
+num_rated_candy %>% 
+  filter(gender == "Male") %>%  
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>%
+  select(gender, candy_type, popularity_score) %>%
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+# Female gender
+num_rated_candy %>% 
+  filter(gender == "Female") %>%  
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>%
+  select(gender, candy_type, popularity_score) %>%
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+# Other gender
+num_rated_candy %>% 
+  filter(gender == "Other") %>%  
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>%
+  select(gender, candy_type, popularity_score) %>%
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+```
+
+
+# Q7 What was the most popular candy bar in each year?
+
+```{r}
+# This nicer method shows the same results with considerably less work
+num_rated_candy %>% 
+  group_by(year, candy_type) %>% 
+  summarise(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  slice_max(popularity_score)
+```
+
+```{r}
+# 2015
+num_rated_candy %>%
+  filter(year == "2015") %>%
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  select(year, candy_type, popularity_score) %>% 
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+  
+# 2016
+num_rated_candy %>%
+  filter(year == "2016") %>%
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  select(year, candy_type, popularity_score) %>% 
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+#2017
+num_rated_candy %>%
+  filter(year == "2017") %>%
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  select(year, candy_type, popularity_score) %>% 
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+# It's always full size candy bars as they are the best
+```
+
+
+# Q8 What was the most popular candy bar by this rating for people in 
+US, Canada, UK, and all other countries?
+
+```{r}
+# This nicer method shows the same results with considerably less work
+num_rated_candy %>% 
+  group_by(country, candy_type) %>%
+  summarise(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  slice_max(popularity_score, with_ties = FALSE)
+
+```
+
+```{r}
+# USA's favourite candy
+num_rated_candy %>%
+  filter(country == "USA") %>% 
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  select(country, candy_type, popularity_score) %>% 
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+# Canada's favourite candy
+num_rated_candy %>%
+  filter(country == "Canada") %>% 
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  select(country, candy_type, popularity_score) %>% 
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+# UK's favourite candy
+num_rated_candy %>%
+  filter(country == "UK") %>% 
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  select(country, candy_type, popularity_score) %>% 
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+#Other's favourite candy
+num_rated_candy %>%
+  filter(country == "Other") %>% 
+  group_by(candy_type) %>% 
+  mutate(popularity_score = sum(rating, na.rm = TRUE)) %>% 
+  select(country, candy_type, popularity_score) %>% 
+  arrange(desc(popularity_score)) %>% 
+  distinct()
+
+# Everyone prefers full sized candy bars, except the UK, where we prefer money, which sounds right actually. 
+
+```
+
